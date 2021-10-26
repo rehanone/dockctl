@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+
+readonly SCRIPT_NAME=$(basename -- "$0")
+readonly DIRECTORY=$(cd `dirname $0` && pwd)
+
+readonly bold=$(tput bold)
+readonly normal=$(tput sgr0)
+
+readonly black=$(tput setaf 0)
+readonly red=$(tput setaf 1)
+readonly green=$(tput setaf 2)
+readonly yellow=$(tput setaf 3)
+readonly blue=$(tput setaf 4)
+readonly magenta=$(tput setaf 5)
+readonly cyan=$(tput setaf 6)
+readonly white=$(tput setaf 7)
+
+readonly HOME_CFG="${HOME}/.dockctl.cfg"
+readonly ETC_CFG="/etc/dockctl/dockctl.cfg"
+
+update_service() {
+  local directory="$1"
+  pushd "${directory}"
+  docker-compose pull && docker-compose down --remove-orphans && docker-compose up --build -d
+  popd
+}
+
+
+stop_service() {
+  local directory="$1"
+  pushd "${directory}"
+  docker-compose down
+  popd
+}
+
+status() {
+  docker run --rm -ti \
+    --name=ctop \
+    --volume /var/run/docker.sock:/var/run/docker.sock:ro \
+    quay.io/vektorlab/ctop:latest
+}
+
+prune() {
+  docker system prune
+}
+
+usage() {
+cat <<EOF
+${bold}Usage:${normal} ${SCRIPT_NAME} [update|stop|prune|status]
+${blue}update${normal} |    Updates all docker compose projects and recreates the containers.
+${blue}stop${normal}   |    Stops all docker compose projects and recreates the containers.
+${green}prune${normal}  |    Prune the docker system on this host.
+${green}status${normal} |    Runs the ctop container that displays each running container on this host.
+${yellow}help${normal}   |    Print this help message.
+Example: ${bold}${SCRIPT_NAME} ${green}status${normal}
+EOF
+}
+
+
+_main() {
+  case $1 in
+    update)
+      if [ -f "${HOME_CFG}" ]; then
+        mapfile -t HOME_CONTAINERS < "${HOME_CFG}"
+      else
+        mapfile -t ETC_CONTAINERS < "${ETC_CFG}"
+      fi
+
+      if (( ${#HOME_CONTAINERS[@]} )); then
+          echo "Using config file: ${bold}${HOME_CFG}${normal}"
+          for ELEMENT in ${HOME_CONTAINERS[@]}
+          do
+            echo "Entering Directory: ${ELEMENT}"
+            update_service "${ELEMENT}"
+          done
+      elif (( ${#ETC_CONTAINERS[@]} )); then
+          echo "Using config file: ${bold}${HOME_CFG}${normal}"
+          for ELEMENT in ${ETC_CONTAINERS[@]}
+          do
+            echo "Entering Directory: ${ELEMENT}"
+            update_service "${ELEMENT}"
+          done
+      else
+          echo "No config file found"
+      fi
+      ;;
+    stop)
+      if [ -f "${HOME_CFG}" ]; then
+        mapfile -t HOME_CONTAINERS < "${HOME_CFG}"
+      else
+        mapfile -t ETC_CONTAINERS < "${ETC_CFG}"
+      fi
+
+      if (( ${#HOME_CONTAINERS[@]} )); then
+          echo "Using config file: ${bold}${HOME_CFG}${normal}"
+          for ELEMENT in ${HOME_CONTAINERS[@]}
+          do
+            echo "Entering Directory: ${ELEMENT}"
+            stop_service "${ELEMENT}"
+          done
+      elif (( ${#ETC_CONTAINERS[@]} )); then
+          echo "Using config file: ${bold}${HOME_CFG}${normal}"
+          for ELEMENT in ${ETC_CONTAINERS[@]}
+          do
+            echo "Entering Directory: ${ELEMENT}"
+            stop_service "${ELEMENT}"
+          done
+      else
+          echo "No config file found"
+      fi
+      ;;
+    prune)
+      prune
+      ;;
+    status)
+      status
+      ;;
+    help)
+      usage
+      ;;
+    *)
+      echo "Wake Up!"
+      ;;
+  esac
+}
+
+_main "$@"
