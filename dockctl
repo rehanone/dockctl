@@ -63,7 +63,7 @@ _main() {
       if [ -f "${USER_HOME_CFG}" ]; then
         mapfile -t HOME_CONTAINERS < "${USER_HOME_CFG}"
       else
-        mapfile -t ETC_CONTAINERS < "${ETC_CFG}"
+        mapfile -t ETC_CONTAINERS < "${SYSTEM_HOME_CFG}"
       fi
 
       if (( ${#HOME_CONTAINERS[@]} )); then
@@ -74,21 +74,21 @@ _main() {
             update_service "${ELEMENT}"
           done
       elif (( ${#ETC_CONTAINERS[@]} )); then
-          echo "Using config file: ${bold}${ETC_CFG}${normal}"
+          echo "Using config file: ${bold}${SYSTEM_HOME_CFG}${normal}"
           for ELEMENT in ${ETC_CONTAINERS[@]}
           do
             echo "Entering Directory: ${ELEMENT}"
             update_service "${ELEMENT}"
           done
       else
-          echo "No config file found in ${bold}${USER_HOME_CFG}${normal} or ${bold}${ETC_CFG}${normal}"
+          echo "No config file found in ${bold}${USER_HOME_CFG}${normal} or ${bold}${SYSTEM_HOME_CFG}${normal}"
       fi
       ;;
     stop)
       if [ -f "${USER_HOME_CFG}" ]; then
         mapfile -t HOME_CONTAINERS < "${USER_HOME_CFG}"
       else
-        mapfile -t ETC_CONTAINERS < "${ETC_CFG}"
+        mapfile -t ETC_CONTAINERS < "${SYSTEM_HOME_CFG}"
       fi
 
       if (( ${#HOME_CONTAINERS[@]} )); then
@@ -99,14 +99,14 @@ _main() {
             stop_service "${ELEMENT}"
           done
       elif (( ${#ETC_CONTAINERS[@]} )); then
-          echo "Using config file: ${bold}${ETC_CFG}${normal}"
+          echo "Using config file: ${bold}${SYSTEM_HOME_CFG}${normal}"
           for ELEMENT in ${ETC_CONTAINERS[@]}
           do
             echo "Entering Directory: ${ELEMENT}"
             stop_service "${ELEMENT}"
           done
       else
-          echo "No config file found in ${bold}${USER_HOME_CFG}${normal} or ${bold}${ETC_CFG}${normal}"
+          echo "No config file found in ${bold}${USER_HOME_CFG}${normal} or ${bold}${SYSTEM_HOME_CFG}${normal}"
       fi
       ;;
     prune)
