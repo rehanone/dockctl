@@ -15,8 +15,8 @@ readonly magenta=$(tput setaf 5)
 readonly cyan=$(tput setaf 6)
 readonly white=$(tput setaf 7)
 
-readonly HOME_CFG="${HOME}/.dockctl.cfg"
-readonly ETC_CFG="/etc/dockctl/dockctl.cfg"
+readonly USER_HOME_CFG="${HOME}/.dockctl.cfg"
+readonly SYSTEM_HOME_CFG="/var/lib/dockctl/dockctl.cfg"
 
 update_service() {
   local directory="$1"
@@ -60,14 +60,14 @@ EOF
 _main() {
   case $1 in
     update)
-      if [ -f "${HOME_CFG}" ]; then
-        mapfile -t HOME_CONTAINERS < "${HOME_CFG}"
+      if [ -f "${USER_HOME_CFG}" ]; then
+        mapfile -t HOME_CONTAINERS < "${USER_HOME_CFG}"
       else
         mapfile -t ETC_CONTAINERS < "${ETC_CFG}"
       fi
 
       if (( ${#HOME_CONTAINERS[@]} )); then
-          echo "Using config file: ${bold}${HOME_CFG}${normal}"
+          echo "Using config file: ${bold}${USER_HOME_CFG}${normal}"
           for ELEMENT in ${HOME_CONTAINERS[@]}
           do
             echo "Entering Directory: ${ELEMENT}"
@@ -81,18 +81,18 @@ _main() {
             update_service "${ELEMENT}"
           done
       else
-          echo "No config file found in ${bold}${HOME_CFG}${normal} or ${bold}${ETC_CFG}${normal}"
+          echo "No config file found in ${bold}${USER_HOME_CFG}${normal} or ${bold}${ETC_CFG}${normal}"
       fi
       ;;
     stop)
-      if [ -f "${HOME_CFG}" ]; then
-        mapfile -t HOME_CONTAINERS < "${HOME_CFG}"
+      if [ -f "${USER_HOME_CFG}" ]; then
+        mapfile -t HOME_CONTAINERS < "${USER_HOME_CFG}"
       else
         mapfile -t ETC_CONTAINERS < "${ETC_CFG}"
       fi
 
       if (( ${#HOME_CONTAINERS[@]} )); then
-          echo "Using config file: ${bold}${HOME_CFG}${normal}"
+          echo "Using config file: ${bold}${USER_HOME_CFG}${normal}"
           for ELEMENT in ${HOME_CONTAINERS[@]}
           do
             echo "Entering Directory: ${ELEMENT}"
@@ -106,7 +106,7 @@ _main() {
             stop_service "${ELEMENT}"
           done
       else
-          echo "No config file found in ${bold}${HOME_CFG}${normal} or ${bold}${ETC_CFG}${normal}"
+          echo "No config file found in ${bold}${USER_HOME_CFG}${normal} or ${bold}${ETC_CFG}${normal}"
       fi
       ;;
     prune)
