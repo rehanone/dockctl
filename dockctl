@@ -18,10 +18,12 @@ readonly white=$(tput setaf 7)
 readonly USER_HOME_CFG="${HOME}/.dockctl.cfg"
 readonly SYSTEM_HOME_CFG="/var/lib/dockctl/dockctl.cfg"
 
+readonly COMPOSE_BIN="/usr/local/bin/docker-compose"
+
 update_service() {
   local directory="$1"
   pushd "${directory}"
-  docker-compose pull && docker-compose down --remove-orphans && docker-compose up --build -d
+  ${COMPOSE_BIN} pull && ${COMPOSE_BIN} down --remove-orphans && ${COMPOSE_BIN} up --build -d
   popd
 }
 
@@ -29,7 +31,7 @@ update_service() {
 stop_service() {
   local directory="$1"
   pushd "${directory}"
-  docker-compose down
+  ${COMPOSE_BIN} down
   popd
 }
 
