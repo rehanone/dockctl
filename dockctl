@@ -43,7 +43,9 @@ status() {
 }
 
 prune() {
-  docker system prune
+  local param="${1}"
+
+  docker system prune ${params}
 }
 
 usage() {
@@ -60,7 +62,10 @@ EOF
 
 
 _main() {
-  case $1 in
+  local command="${1}"
+  local params="${@:2}"
+
+  case ${command} in
     update)
       if [ -f "${USER_HOME_CFG}" ]; then
         mapfile -t HOME_CONTAINERS < "${USER_HOME_CFG}"
@@ -112,7 +117,7 @@ _main() {
       fi
       ;;
     prune)
-      prune
+      prune ${params}
       ;;
     status)
       status
