@@ -1,3 +1,9 @@
+## 1.0.0 (February 7, 2022)
+
+**Features:**
+
+  - Converted `docker-compose` command from v1 to v2.
+
 ## 0.0.2 (October 26, 2021)
 
 **Bugfixes:**
