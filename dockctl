@@ -18,7 +18,7 @@ readonly white=$(tput setaf 7)
 readonly USER_HOME_CFG="${HOME}/.dockctl.cfg"
 readonly SYSTEM_HOME_CFG="/var/lib/dockctl/dockctl.cfg"
 
-readonly COMPOSE_BIN="/usr/local/bin/docker-compose"
+readonly COMPOSE_BIN="/usr/bin/docker compose"
 
 update_service() {
   local directory="$1"
