@@ -23,7 +23,7 @@ readonly COMPOSE_BIN="/usr/bin/docker compose"
 update_service() {
   local directory="$1"
   pushd "${directory}"
-  ${COMPOSE_BIN} pull && ${COMPOSE_BIN} down --remove-orphans && ${COMPOSE_BIN} up --build -d
+  ${COMPOSE_BIN} pull && ${COMPOSE_BIN} down --remove-orphans && ${COMPOSE_BIN} up --build --detach --wait
   popd
 }
 
