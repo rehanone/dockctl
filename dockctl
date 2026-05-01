@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 readonly SCRIPT_NAME=$(basename -- "$0")
-readonly DIRECTORY=$(cd `dirname $0` && pwd)
 
 readonly bold=$(tput bold)
 readonly normal=$(tput sgr0)
@@ -17,113 +16,136 @@ readonly white=$(tput setaf 7)
 
 readonly USER_HOME_CFG="${HOME}/.dockctl.cfg"
 readonly SYSTEM_HOME_CFG="/var/lib/dockctl/dockctl.cfg"
+readonly SYSTEM_SECRET="/var/lib/dockctl/.dockctl.secret"
 
 readonly COMPOSE_BIN="/usr/bin/docker compose"
 
-update_service() {
-  local directory="$1"
-  pushd "${directory}"
-  ${COMPOSE_BIN} pull && ${COMPOSE_BIN} down --remove-orphans && ${COMPOSE_BIN} up --build --detach --wait
-  popd
+docker_login() {
+  if [[ -f "${SYSTEM_SECRET}" && -s "${SYSTEM_SECRET}" ]]; then
+    echo "Secret file found. Processing logins..."
+    
+    while IFS=':' read -r DOCKER_REG DOCKER_USER DOCKER_PASS || [[ -n "${DOCKER_REG}" ]]; do
+      # Trim whitespace
+      DOCKER_REG=$(echo "${DOCKER_REG}" | xargs)
+      [[ -z "${DOCKER_REG}" || "${DOCKER_REG}" == "#"* ]] && continue
+
+      if [[ -n "${DOCKER_USER}" && -n "${DOCKER_PASS}" ]]; then
+         echo "Logging into ${DOCKER_REG}..."
+         echo "${DOCKER_PASS}" | docker login "${DOCKER_REG}" -u "${DOCKER_USER}" --password-stdin
+      else
+         echo "${yellow}Warning:${normal} Skipping invalid line in secret file."
+      fi
+    done < "${SYSTEM_SECRET}"
+  fi
 }
 
+update_service() {
+  local directory="$1"
+  if [[ ! -d "${directory}" ]]; then
+    echo "${red}Error:${normal} Directory ${directory} not found. Skipping."
+    return 1
+  fi
+  pushd "${directory}" > /dev/null || return
+  ${COMPOSE_BIN} pull && ${COMPOSE_BIN} down --remove-orphans && ${COMPOSE_BIN} up --build --detach --wait
+  popd > /dev/null || return
+}
+
+redeploy_service() {
+  local directory="$1"
+  if [[ ! -d "${directory}" ]]; then
+    echo "${red}Error:${normal} Directory ${directory} not found. Skipping."
+    return 1
+  fi
+  pushd "${directory}" > /dev/null || return
+  ${COMPOSE_BIN} down --remove-orphans && ${COMPOSE_BIN} up --build --detach --wait
+  popd > /dev/null || return
+}
 
 stop_service() {
   local directory="$1"
-  pushd "${directory}"
+  if [[ ! -d "${directory}" ]]; then
+    echo "${red}Error:${normal} Directory ${directory} not found. Skipping."
+    return 1
+  fi
+  pushd "${directory}" > /dev/null || return
   ${COMPOSE_BIN} down
-  popd
+  popd > /dev/null || return
 }
 
-status() {
-  docker run --rm -ti \
-    --name=ctop \
-    --volume /var/run/docker.sock:/var/run/docker.sock:ro \
-    quay.io/vektorlab/ctop:latest
-}
-
-prune() {
-  local param="${1}"
-
-  docker system prune ${params}
+_get_config() {
+  if [[ -f "${USER_HOME_CFG}" ]]; then
+    echo "${USER_HOME_CFG}"
+  elif [[ -f "${SYSTEM_HOME_CFG}" ]]; then
+    echo "${SYSTEM_HOME_CFG}"
+  fi
 }
 
 usage() {
 cat <<EOF
-${bold}Usage:${normal} ${SCRIPT_NAME} [update|stop|prune|status]
-${blue}update${normal} |    Updates all docker compose projects and recreates the containers.
-${blue}stop${normal}   |    Stops all docker compose projects and recreates the containers.
-${green}prune${normal}  |    Prune the docker system on this host.
-${green}status${normal} |    Runs the ctop container that displays each running container on this host.
-${yellow}help${normal}   |    Print this help message.
-Example: ${bold}${SCRIPT_NAME} ${green}status${normal}
+${bold}Usage:${normal} ${SCRIPT_NAME} <command> [stack_names...]
+
+${bold}Commands:${normal}
+  ${blue}update${normal}    Pulls images and restarts stacks.
+  ${green}redeploy${normal}  Restarts stacks without pulling new images.
+  ${red}stop${normal}      Stops stacks.
+  ${magenta}prune${normal}     Prune the docker system.
+  ${cyan}help${normal}      Print this help message.
+
+${bold}Arguments:${normal}
+  [stack_names]  Optional list of specific stacks (e.g. keycloak traefik).
 EOF
 }
 
-
 _main() {
   local command="${1}"
-  local params="${@:2}"
+  local targets=("${@:2}") # Correctly captured as array
+  local config_file
+  config_file=$(_get_config) # Separated to catch return values
 
   case ${command} in
-    update)
-      if [ -f "${USER_HOME_CFG}" ]; then
-        mapfile -t HOME_CONTAINERS < "${USER_HOME_CFG}"
-      else
-        mapfile -t ETC_CONTAINERS < "${SYSTEM_HOME_CFG}"
+    update|redeploy|stop)
+      if [[ -z "${config_file}" ]]; then
+        echo "No config file found."
+        exit 1
       fi
 
-      if (( ${#HOME_CONTAINERS[@]} )); then
-          echo "Using config file: ${bold}${USER_HOME_CFG}${normal}"
-          for ELEMENT in ${HOME_CONTAINERS[@]}
-          do
-            echo "Entering Directory: ${ELEMENT}"
-            update_service "${ELEMENT}"
+      mapfile -t ALL_CONTAINERS < "${config_file}"
+      local filtered_containers=()
+
+      if (( ${#targets[@]} > 0 )); then
+        for target in "${targets[@]}"; do
+          local found=false
+          for path in "${ALL_CONTAINERS[@]}"; do
+            if [[ "${path}" == *"/$target" || "${path}" == "$target" ]]; then
+              filtered_containers+=("$path")
+              found=true
+              break
+            fi
           done
-      elif (( ${#ETC_CONTAINERS[@]} )); then
-          echo "Using config file: ${bold}${SYSTEM_HOME_CFG}${normal}"
-          for ELEMENT in ${ETC_CONTAINERS[@]}
-          do
-            echo "Entering Directory: ${ELEMENT}"
-            update_service "${ELEMENT}"
-          done
+          [[ "$found" == false ]] && echo "${yellow}Warning:${normal} Stack '${target}' not found in config."
+        done
       else
-          echo "No config file found in ${bold}${USER_HOME_CFG}${normal} or ${bold}${SYSTEM_HOME_CFG}${normal}"
-      fi
-      ;;
-    stop)
-      if [ -f "${USER_HOME_CFG}" ]; then
-        mapfile -t HOME_CONTAINERS < "${USER_HOME_CFG}"
-      else
-        mapfile -t ETC_CONTAINERS < "${SYSTEM_HOME_CFG}"
+        filtered_containers=("${ALL_CONTAINERS[@]}")
       fi
 
-      if (( ${#HOME_CONTAINERS[@]} )); then
-          echo "Using config file: ${bold}${USER_HOME_CFG}${normal}"
-          for ELEMENT in ${HOME_CONTAINERS[@]}
-          do
-            echo "Entering Directory: ${ELEMENT}"
-            stop_service "${ELEMENT}"
-          done
-      elif (( ${#ETC_CONTAINERS[@]} )); then
-          echo "Using config file: ${bold}${SYSTEM_HOME_CFG}${normal}"
-          for ELEMENT in ${ETC_CONTAINERS[@]}
-          do
-            echo "Entering Directory: ${ELEMENT}"
-            stop_service "${ELEMENT}"
-          done
-      else
-          echo "No config file found in ${bold}${USER_HOME_CFG}${normal} or ${bold}${SYSTEM_HOME_CFG}${normal}"
+      if (( ${#filtered_containers[@]} == 0 )); then
+        echo "${red}Error:${normal} No valid stacks to process."
+        exit 1
       fi
+
+      [[ "${command}" == "update" ]] && docker_login
+
+      for ELEMENT in "${filtered_containers[@]}"; do
+        echo "Processing Stack: ${bold}${ELEMENT}${normal}"
+        case ${command} in
+          update)   update_service "${ELEMENT}" ;;
+          redeploy) redeploy_service "${ELEMENT}" ;;
+          stop)     stop_service "${ELEMENT}" ;;
+        esac
+      done
       ;;
     prune)
-      prune ${params}
-      ;;
-    status)
-      status
-      ;;
-    help)
-      usage
+      docker system prune "${targets[@]}"
       ;;
     *)
       usage
