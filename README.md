@@ -77,30 +77,5 @@ dockctl redeploy keycloak filedrop
 dockctl stop traefik
 ```
 
-## Ansible Integration
-
-`dockctl` is designed to be deployed and managed via Ansible. Here is an example task to manage your registry secrets:
-
-```yaml
-- name: Create .dockctl secret file
-  become: true
-  ansible.builtin.template:
-    src: dockctl.secret.j2
-    dest: '/var/lib/dockctl/.dockctl.secret'
-    owner: root
-    group: docker
-    mode: '0640'
-  vars:
-    repositories: "{{ dockctl_settings.repositories }}"
-  when: dockctl_settings.repositories | length > 0
-```
-
-**Template (`dockctl.secret.j2`):**
-```jinja2
-{% for repo in repositories -%}
-{{ repo.name }}:{{ repo.username }}:{{ repo.password }}
-{% endfor -%}
-```
-
 ## License
 MIT
